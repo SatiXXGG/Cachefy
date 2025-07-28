@@ -11,6 +11,8 @@ export default class Cachefy<K, V> {
 		sendKeyUpdate: Net.Definitions.ServerToClientEvent<[key: unknown]>(),
 		getValue: Net.Definitions.ServerFunction<(key: unknown) => unknown | undefined>(),
 	});
+	static cleanup_time = 60;
+	private lastCleanup = tick();
 	private cached = new Map<K, ICacheInfo<V>>();
 	private middleware = new Set<(player: Player, key: K) => boolean>();
 	private isValid(timestamp: number, lifetime: number) {
@@ -41,6 +43,15 @@ export default class Cachefy<K, V> {
 	}
 
 	set(key: K, value: V, lifetime: number = math.huge) {
+		if (tick() - this.lastCleanup > Cachefy.cleanup_time) {
+			this.lastCleanup = tick();
+			this.cached.forEach((value, key) => {
+				if (!this.isValid(value.timestamp, value.lifetime)) {
+					this.cached.delete(key);
+				}
+			});
+		}
+
 		if (this.updateCallbacks.has(key)) {
 			const callbacks = this.updateCallbacks.get(key);
 			if (callbacks) {
@@ -92,7 +103,6 @@ export default class Cachefy<K, V> {
 		if (game.GetService("RunService").IsServer()) {
 			this.onUpdate((key) => {
 				const got = this.cached.get(key);
-				print("got", got);
 				if (got) {
 					const players = game.GetService("Players").GetPlayers();
 					players.forEach((player) => {
