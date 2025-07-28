@@ -1,5 +1,4 @@
 import Net from "@rbxts/net";
-import { Event } from "@rbxts/net/out/server";
 
 interface ICacheInfo<T> {
 	value: T;
@@ -7,7 +6,7 @@ interface ICacheInfo<T> {
 	lifetime: number;
 }
 
-export class Cachefy<K, V> {
+export default class Cachefy<K, V> {
 	private events = Net.CreateDefinitions({
 		sendKeyUpdate: Net.Definitions.ServerToClientEvent<[key: unknown]>(),
 		getValue: Net.Definitions.ServerFunction<(key: unknown) => unknown | undefined>(),
@@ -15,7 +14,7 @@ export class Cachefy<K, V> {
 	private cached = new Map<K, ICacheInfo<V>>();
 	private middleware = new Set<(player: Player, key: K) => boolean>();
 	private isValid(timestamp: number, lifetime: number) {
-		return tick() - timestamp > lifetime;
+		return tick() - timestamp < lifetime;
 	}
 
 	private updateCallbacks = new Map<K, Set<() => void>>();
@@ -76,10 +75,10 @@ export class Cachefy<K, V> {
 				return gotKey.value;
 			} else {
 				this.cached.delete(key);
-				if (onUndefined) onUndefined();
+				if (onUndefined) this.set(key, onUndefined());
 			}
 		} else {
-			if (onUndefined) onUndefined();
+			if (onUndefined) this.set(key, onUndefined());
 		}
 	}
 
@@ -93,6 +92,7 @@ export class Cachefy<K, V> {
 		if (game.GetService("RunService").IsServer()) {
 			this.onUpdate((key) => {
 				const got = this.cached.get(key);
+				print("got", got);
 				if (got) {
 					const players = game.GetService("Players").GetPlayers();
 					players.forEach((player) => {
@@ -141,7 +141,7 @@ export class Cachefy<K, V> {
 					this.events.Client.Get("getValue")
 						.CallServerAsync(key)
 						.then((value) => {
-							if (value) {
+							if (value !== undefined) {
 								this.set(key as K, value as V);
 							}
 						});
