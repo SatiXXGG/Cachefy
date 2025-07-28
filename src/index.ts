@@ -38,7 +38,7 @@ export default class Cachefy<K, V> {
 		this.globalUpdates.add(callback);
 	}
 
-	addMiddleware(callback: (player: Player) => boolean) {
+	addMiddleware(callback: (player: Player, key: K) => boolean) {
 		this.middleware.add(callback);
 	}
 
