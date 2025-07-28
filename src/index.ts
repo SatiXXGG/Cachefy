@@ -1,0 +1,152 @@
+import Net from "@rbxts/net";
+import { Event } from "@rbxts/net/out/server";
+
+interface ICacheInfo<T> {
+	value: T;
+	timestamp: number;
+	lifetime: number;
+}
+
+export class Cachefy<K, V> {
+	private events = Net.CreateDefinitions({
+		sendKeyUpdate: Net.Definitions.ServerToClientEvent<[key: unknown]>(),
+		getValue: Net.Definitions.ServerFunction<(key: unknown) => unknown | undefined>(),
+	});
+	private cached = new Map<K, ICacheInfo<V>>();
+	private middleware = new Set<(player: Player, key: K) => boolean>();
+	private isValid(timestamp: number, lifetime: number) {
+		return tick() - timestamp > lifetime;
+	}
+
+	private updateCallbacks = new Map<K, Set<() => void>>();
+	private globalUpdates = new Set<(key: K) => void>();
+	/**
+	 * Sets a value to the cache
+	 * @param key
+	 * @param value
+	 */
+
+	onKeyUpdate(key: K, callback: () => void) {
+		const callbacks = this.updateCallbacks.get(key);
+		if (callbacks) {
+			callbacks.add(callback);
+		}
+	}
+
+	onUpdate(callback: (key: K) => void) {
+		this.globalUpdates.add(callback);
+	}
+
+	addMiddleware(callback: (player: Player) => boolean) {
+		this.middleware.add(callback);
+	}
+
+	set(key: K, value: V, lifetime: number = math.huge) {
+		if (this.updateCallbacks.has(key)) {
+			const callbacks = this.updateCallbacks.get(key);
+			if (callbacks) {
+				for (const callback of callbacks) {
+					task.spawn(() => callback());
+				}
+			}
+		} else {
+			this.updateCallbacks.set(key, new Set());
+		}
+
+		this.globalUpdates.forEach((callback) => {
+			task.spawn(() => callback(key));
+		});
+
+		this.cached.set(key, {
+			value,
+			timestamp: tick(),
+			lifetime: lifetime,
+		});
+	}
+	/**
+	 * Gets the given key
+	 * @param key
+	 */
+
+	get(key: K, onUndefined?: () => V) {
+		const gotKey = this.cached.get(key);
+		if (gotKey) {
+			const isValid = this.isValid(gotKey.timestamp, gotKey.lifetime);
+			if (isValid) {
+				return gotKey.value;
+			} else {
+				this.cached.delete(key);
+				if (onUndefined) onUndefined();
+			}
+		} else {
+			if (onUndefined) onUndefined();
+		}
+	}
+
+	clearKey(key: K) {
+		this.cached.delete(key);
+	}
+	clear() {
+		this.cached.clear();
+	}
+	allowReplication() {
+		if (game.GetService("RunService").IsServer()) {
+			this.onUpdate((key) => {
+				const got = this.cached.get(key);
+				if (got) {
+					const players = game.GetService("Players").GetPlayers();
+					players.forEach((player) => {
+						let failed = false;
+						this.middleware.forEach((callback) => {
+							if (!failed) {
+								const result = callback(player, key);
+								if (!result) {
+									failed = true;
+									return;
+								}
+							}
+						});
+
+						if (!failed) {
+							this.events.Server.Get("sendKeyUpdate").SendToPlayer(player, key);
+						}
+					});
+				}
+			});
+
+			this.events.Server.Get("getValue").SetCallback((player: Player, key) => {
+				const got = this.cached.get(key as K);
+				if (got) {
+					const isValid = this.isValid(got.timestamp, got.lifetime);
+					if (isValid) {
+						return got.value;
+					} else {
+						this.cached.delete(key as K);
+					}
+				}
+			});
+		} else {
+			this.events.Client.Get("sendKeyUpdate").Connect((key) => {
+				let failed = false;
+				this.middleware.forEach((callback) => {
+					if (!failed) {
+						const result = callback(game.GetService("Players").LocalPlayer, key as K);
+						if (!result) {
+							failed = true;
+							return;
+						}
+					}
+				});
+				if (!failed) {
+					this.events.Client.Get("getValue")
+						.CallServerAsync(key)
+						.then((value) => {
+							if (value) {
+								this.set(key as K, value as V);
+							}
+						});
+				}
+			});
+		}
+	}
+}
