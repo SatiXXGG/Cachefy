@@ -54,22 +54,20 @@ export default class Cachefy<K, V> {
 
 		//Checks difference
 		const old = this.cached.get(key);
-		if (old && old !== value) {
-			if (this.updateCallbacks.has(key)) {
-				const callbacks = this.updateCallbacks.get(key);
-				if (callbacks) {
-					for (const callback of callbacks) {
-						task.spawn(() => callback());
-					}
+		if (this.updateCallbacks.has(key)) {
+			const callbacks = this.updateCallbacks.get(key);
+			if (callbacks) {
+				for (const callback of callbacks) {
+					task.spawn(() => callback());
 				}
-			} else {
-				this.updateCallbacks.set(key, new Set());
 			}
-
-			this.globalUpdates.forEach((callback) => {
-				task.spawn(() => callback(key));
-			});
+		} else {
+			this.updateCallbacks.set(key, new Set());
 		}
+
+		this.globalUpdates.forEach((callback) => {
+			task.spawn(() => callback(key));
+		});
 
 		this.cached.set(key, {
 			value,
