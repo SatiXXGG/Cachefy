@@ -161,4 +161,11 @@ export default class Cachefy<K, V> {
 			});
 		}
 	}
+	/**
+	 * gets the key K, if called from client it will grab the key from the server
+	 * @param key
+	 */
+	grab(key: K) {
+		return this.events.Client.Get("getValue").CallServerAsync(key) as K;
+	}
 }
