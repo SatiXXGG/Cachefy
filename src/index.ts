@@ -54,7 +54,7 @@ export default class Cachefy<K, V> {
 
 		//Checks difference
 		const old = this.cached.get(key);
-		if (old && old !== value && tick() - old.timestamp > 0.1) {
+		if (old && old !== value) {
 			if (this.updateCallbacks.has(key)) {
 				const callbacks = this.updateCallbacks.get(key);
 				if (callbacks) {
