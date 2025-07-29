@@ -166,6 +166,6 @@ export default class Cachefy<K, V> {
 	 * @param key
 	 */
 	grab(key: K) {
-		return this.events.Client.Get("getValue").CallServerAsync(key) as K;
+		return this.events.Client.Get("getValue").CallServerAsync(key) as V;
 	}
 }
