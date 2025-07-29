@@ -91,12 +91,14 @@ export default class Cachefy<K, V> {
 				if (onUndefined) {
 					const value = onUndefined();
 					if (value !== undefined) this.set(key, value);
+					return value;
 				}
 			}
 		} else {
 			if (onUndefined) {
 				const value = onUndefined();
 				if (value !== undefined) this.set(key, value);
+				return value;
 			}
 		}
 	}
