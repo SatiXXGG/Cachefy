@@ -52,20 +52,24 @@ export default class Cachefy<K, V> {
 			});
 		}
 
-		if (this.updateCallbacks.has(key)) {
-			const callbacks = this.updateCallbacks.get(key);
-			if (callbacks) {
-				for (const callback of callbacks) {
-					task.spawn(() => callback());
+		//Checks difference
+		const old = this.cached.get(key);
+		if (old && old !== value && tick() - old.timestamp > 0.1) {
+			if (this.updateCallbacks.has(key)) {
+				const callbacks = this.updateCallbacks.get(key);
+				if (callbacks) {
+					for (const callback of callbacks) {
+						task.spawn(() => callback());
+					}
 				}
+			} else {
+				this.updateCallbacks.set(key, new Set());
 			}
-		} else {
-			this.updateCallbacks.set(key, new Set());
-		}
 
-		this.globalUpdates.forEach((callback) => {
-			task.spawn(() => callback(key));
-		});
+			this.globalUpdates.forEach((callback) => {
+				task.spawn(() => callback(key));
+			});
+		}
 
 		this.cached.set(key, {
 			value,
