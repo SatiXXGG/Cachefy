@@ -80,7 +80,7 @@ export default class Cachefy<K, V> {
 	 * @param key
 	 */
 
-	get(key: K, onUndefined?: () => V) {
+	get(key: K, onUndefined?: () => V | undefined) {
 		const gotKey = this.cached.get(key);
 		if (gotKey) {
 			const isValid = this.isValid(gotKey.timestamp, gotKey.lifetime);
@@ -88,10 +88,16 @@ export default class Cachefy<K, V> {
 				return gotKey.value;
 			} else {
 				this.cached.delete(key);
-				if (onUndefined) this.set(key, onUndefined());
+				if (onUndefined) {
+					const value = onUndefined();
+					if (value !== undefined) this.set(key, value);
+				}
 			}
 		} else {
-			if (onUndefined) this.set(key, onUndefined());
+			if (onUndefined) {
+				const value = onUndefined();
+				if (value !== undefined) this.set(key, value);
+			}
 		}
 	}
 
