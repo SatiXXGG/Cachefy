@@ -11,7 +11,7 @@ export default class Cachefy<K, V> {
 		sendKeyUpdate: Net.Definitions.ServerToClientEvent<[key: unknown]>(),
 		getValue: Net.Definitions.ServerFunction<(key: unknown) => unknown | undefined>(),
 	});
-	static cleanup_time = 60;
+	public static cleanup_time = 60;
 	private lastCleanup = tick();
 	private cached = new Map<K, ICacheInfo<V>>();
 	private middleware = new Set<(player: Player, key: K) => boolean>();
