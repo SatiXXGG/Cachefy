@@ -15,6 +15,8 @@ export default class Cachefy<K, V> {
 	private lastCleanup = tick();
 	private cached = new Map<K, ICacheInfo<V>>();
 	private middleware = new Set<(player: Player, key: K) => boolean>();
+	public send: ((data: V) => buffer) | undefined = undefined;
+	public receive: ((data: buffer) => V) | undefined = undefined;
 	private isValid(timestamp: number, lifetime: number) {
 		return tick() - timestamp < lifetime;
 	}
@@ -139,6 +141,9 @@ export default class Cachefy<K, V> {
 				if (got) {
 					const isValid = this.isValid(got.timestamp, got.lifetime);
 					if (isValid) {
+						if (this.send) {
+							return this.send(got.value);
+						}
 						return got.value;
 					} else {
 						this.cached.delete(key as K);
@@ -162,6 +167,10 @@ export default class Cachefy<K, V> {
 						.CallServerAsync(key)
 						.then((value) => {
 							if (value !== undefined) {
+								if (this.receive) {
+									this.set(key as K, this.receive(value as buffer) as V);
+									return;
+								}
 								this.set(key as K, value as V);
 							}
 						});
